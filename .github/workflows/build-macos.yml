@@ -17,6 +17,20 @@ jobs:
         with:
           version: '6.6.0'
 
+      # Krok diagnostyczny: Sprawdź i wyświetl zawartość pliku .pro
+      - name: Verify .pro file configuration
+        run: |
+          echo "Looking for .pro file in the root directory..."
+          PRO_FILE=$(find . -maxdepth 1 -name "*.pro" -print -quit)
+          if [ -z "$PRO_FILE" ]; then
+            echo "::error::No .pro file found in the root directory. Make sure it was pushed to GitHub."
+            exit 1
+          fi
+          echo "Found project file: $PRO_FILE"
+          echo "--- Displaying its content below ---"
+          cat "$PRO_FILE"
+          echo "--- End of .pro file content ---"
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -32,25 +46,22 @@ jobs:
           qmake CONFIG+=release
           make
 
-      # Krok diagnostyczny: Pokaż, co i gdzie zostało zbudowane
       - name: List all files after build
         run: |
           echo "Recursively listing all files in the current directory..."
           ls -RF .
 
-      # Zmodyfikowany, bardziej niezawodny krok: Znajdź .app i zakończ, jeśli go nie ma
       - name: Find the .app bundle and verify it exists
         id: find_app
         run: |
           APP_PATH=$(find . -name "*.app" -print -quit)
           if [ -z "$APP_PATH" ]; then
-            echo "::error::Build failed: The .app bundle was not found after compilation."
+            echo "::error::Build failed: The .app bundle was not found after compilation. Verify that TEMPLATE = app is present in the .pro file."
             exit 1
           fi
           echo "App bundle found at: $APP_PATH"
           echo "app_path=$APP_PATH" >> "$GITHUB_OUTPUT"
       
-      # Od teraz używamy ścieżki znalezionej w poprzednim kroku
       - name: Package Qt libraries into the .app bundle
         run: macdeployqt "${{ steps.find_app.outputs.app_path }}"
 
@@ -71,6 +82,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: PythonRunner-macOS
-          # Znajdź plik .dmg, który macdeployqt stworzy w głównym folderze
           path: "*.dmg"
 
