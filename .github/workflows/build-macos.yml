@@ -32,14 +32,22 @@ jobs:
           qmake CONFIG+=release
           make
 
-      # Nowy, inteligentny krok: Znajdź, gdzie została zbudowana aplikacja .app
-      - name: Find the .app bundle
-        id: find_app # Nadajemy temu krokowi ID, aby odwołać się do jego wyniku
+      # Krok diagnostyczny: Pokaż, co i gdzie zostało zbudowane
+      - name: List all files after build
         run: |
-          # Znajdź ścieżkę do pliku .app i zapisz ją jako "output" dla kolejnych kroków
+          echo "Recursively listing all files in the current directory..."
+          ls -RF .
+
+      # Zmodyfikowany, bardziej niezawodny krok: Znajdź .app i zakończ, jeśli go nie ma
+      - name: Find the .app bundle and verify it exists
+        id: find_app
+        run: |
           APP_PATH=$(find . -name "*.app" -print -quit)
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::Build failed: The .app bundle was not found after compilation."
+            exit 1
+          fi
           echo "App bundle found at: $APP_PATH"
-          # Ustaw zmienną wyjściową, której można użyć w innych krokach
           echo "app_path=$APP_PATH" >> "$GITHUB_OUTPUT"
       
       # Od teraz używamy ścieżki znalezionej w poprzednim kroku
@@ -48,17 +56,10 @@ jobs:
 
       - name: Embed Python and Scripts into the .app bundle
         run: |
-          # Pobierz ścieżkę ze zmiennej wyjściowej kroku 'find_app'
           APP_PATH="${{ steps.find_app.outputs.app_path }}"
           echo "App bundle path is: $APP_PATH"
-
-          echo "Creating target directories inside the .app bundle..."
           mkdir -p "$APP_PATH/Contents/Resources/"
-
-          echo "Copying scripts folder..."
           cp -R scripts/ "$APP_PATH/Contents/Resources/scripts"
-
-          echo "Locating and copying Python installation..."
           PY_INSTALL_DIR=$(dirname $(dirname $(which python)))
           echo "Python installation found at: $PY_INSTALL_DIR"
           cp -R "$PY_INSTALL_DIR" "$APP_PATH/Contents/Resources/python"
