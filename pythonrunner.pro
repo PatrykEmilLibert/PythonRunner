@@ -1,3 +1,6 @@
+TEMPLATE = app
+TARGET = PythonRunner
+
 QT += core gui widgets
 
 CONFIG += c++17 cmdline
