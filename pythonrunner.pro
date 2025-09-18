@@ -1,9 +1,9 @@
 QT += core gui widgets
 
+CONFIG += c++17 cmdline
+
 TEMPLATE = app
 TARGET = PythonRunner
-
-CONFIG += c++17 cmdline
 
 # You can make your code fail to compile if it uses deprecated APIs.
 # In order to do so, uncomment the following line.
@@ -11,10 +11,7 @@ CONFIG += c++17 cmdline
 
 SOURCES += main.cpp
 
-# Default rules for deployment.
-qnx: target.path = /tmp/$${TARGET}/bin
-else: unix:!android: target.path = /opt/$${TARGET}/bin
-!isEmpty(target.path): INSTALLS += target
+CONFIG += recheck_dependencies
 
 RC_ICONS = icon.ico
 
