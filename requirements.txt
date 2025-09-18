@@ -141,7 +141,6 @@ python-docx==1.1.2
 python-dotenv==1.1.1
 pytweening==1.2.0
 pytz==2025.2
-pywin32==310
 pywin32-ctypes==0.2.3
 PyYAML==6.0.2
 pyzmq==27.1.0
