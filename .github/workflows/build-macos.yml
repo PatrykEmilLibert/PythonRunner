@@ -1,0 +1,58 @@
+name: Build macOS Application
+
+on:
+  push:
+    branches: [ "master", "main" ]
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: '6.6.0'
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies from requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Build the C++ application
+        run: |
+          qmake
+          make
+
+      - name: Package Qt libraries into the .app bundle
+        run: macdeployqt pythonrunner.app
+
+      - name: Embed Python and Scripts into the .app bundle
+        run: |
+          echo "Creating target directories inside the .app bundle..."
+          mkdir -p pythonrunner.app/Contents/Resources/
+
+          echo "Copying scripts folder..."
+          cp -R scripts/ pythonrunner.app/Contents/Resources/scripts
+
+          echo "Locating and copying Python installation..."
+          PY_INSTALL_DIR=$(dirname $(dirname $(which python)))
+          echo "Python installation found at: $PY_INSTALL_DIR"
+          cp -R "$PY_INSTALL_DIR" pythonrunner.app/Contents/Resources/python
+
+      - name: Create final DMG from the completed .app bundle
+        run: macdeployqt pythonrunner.app -dmg
+
+      - name: Upload final DMG as a build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PythonRunner-macOS
+          path: pythonrunner.dmg
