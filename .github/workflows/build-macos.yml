@@ -29,30 +29,35 @@ jobs:
 
       - name: Build the C++ application
         run: |
-          qmake
+          # Jawnie tworzymy konfigurację "Release", która umieści wynik w podfolderze /release
+          qmake CONFIG+=release
           make
 
       - name: Package Qt libraries into the .app bundle
-        run: macdeployqt pythonrunner.app
+        # Wskazujemy poprawną ścieżkę do pliku .app w folderze "release"
+        run: macdeployqt release/pythonrunner.app
 
       - name: Embed Python and Scripts into the .app bundle
         run: |
           echo "Creating target directories inside the .app bundle..."
-          mkdir -p pythonrunner.app/Contents/Resources/
+          mkdir -p release/pythonrunner.app/Contents/Resources/
 
           echo "Copying scripts folder..."
-          cp -R scripts/ pythonrunner.app/Contents/Resources/scripts
+          cp -R scripts/ release/pythonrunner.app/Contents/Resources/scripts
 
           echo "Locating and copying Python installation..."
           PY_INSTALL_DIR=$(dirname $(dirname $(which python)))
           echo "Python installation found at: $PY_INSTALL_DIR"
-          cp -R "$PY_INSTALL_DIR" pythonrunner.app/Contents/Resources/python
+          cp -R "$PY_INSTALL_DIR" release/pythonrunner.app/Contents/Resources/python
 
       - name: Create final DMG from the completed .app bundle
-        run: macdeployqt pythonrunner.app -dmg
+        # Ponownie wskazujemy poprawną ścieżkę
+        run: macdeployqt release/pythonrunner.app -dmg
 
       - name: Upload final DMG as a build artifact
         uses: actions/upload-artifact@v4
         with:
           name: PythonRunner-macOS
-          path: pythonrunner.dmg
+          # Wskazujemy, że plik .dmg do spakowania również znajduje się w folderze "release"
+          path: release/pythonrunner.dmg
+
