@@ -17,8 +17,9 @@ jobs:
         with:
           version: '6.6.0'
 
-      # Krok diagnostyczny: Sprawdź i wyświetl zawartość pliku .pro
+      # Krok diagnostyczny, który teraz również zapisuje wynik do użycia później
       - name: Verify .pro file configuration
+        id: find_pro # Nadajemy temu krokowi ID
         run: |
           echo "Looking for .pro file in the root directory..."
           PRO_FILE=$(find . -maxdepth 1 -name "*.pro" -print -quit)
@@ -30,6 +31,8 @@ jobs:
           echo "--- Displaying its content below ---"
           cat "$PRO_FILE"
           echo "--- End of .pro file content ---"
+          # Zapisz ścieżkę do pliku .pro jako zmienną wyjściową
+          echo "pro_file=$PRO_FILE" >> "$GITHUB_OUTPUT"
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -41,9 +44,11 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
+      # Zmodyfikowany krok budowania: jawnie wskazujemy plik .pro
       - name: Build the C++ application
         run: |
-          qmake CONFIG+=release
+          # Użyj ścieżki do pliku .pro znalezionej w poprzednim kroku
+          qmake "${{ steps.find_pro.outputs.pro_file }}" CONFIG+=release
           make
 
       - name: List all files after build
