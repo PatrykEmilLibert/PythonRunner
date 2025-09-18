@@ -32,21 +32,25 @@ jobs:
           qmake CONFIG+=release
           make
 
-      # Krok diagnostyczny: Pokaż, co zostało zbudowane
-      - name: List build results
+      # Nowy, inteligentny krok: Znajdź, gdzie została zbudowana aplikacja .app
+      - name: Find the .app bundle
+        id: find_app # Nadajemy temu krokowi ID, aby odwołać się do jego wyniku
         run: |
-          echo "Listing contents of the release directory:"
-          ls -R release/
-
+          # Znajdź ścieżkę do pliku .app i zapisz ją jako "output" dla kolejnych kroków
+          APP_PATH=$(find . -name "*.app" -print -quit)
+          echo "App bundle found at: $APP_PATH"
+          # Ustaw zmienną wyjściową, której można użyć w innych krokach
+          echo "app_path=$APP_PATH" >> "$GITHUB_OUTPUT"
+      
+      # Od teraz używamy ścieżki znalezionej w poprzednim kroku
       - name: Package Qt libraries into the .app bundle
-        # Użyj symbolu wieloznacznego (*), aby skrypt sam znalazł plik .app
-        run: macdeployqt release/*.app
+        run: macdeployqt "${{ steps.find_app.outputs.app_path }}"
 
       - name: Embed Python and Scripts into the .app bundle
         run: |
-          # Znajdź ścieżkę do pliku .app i zapisz ją w zmiennej
-          APP_PATH=$(ls -d release/*.app)
-          echo "App bundle found at: $APP_PATH"
+          # Pobierz ścieżkę ze zmiennej wyjściowej kroku 'find_app'
+          APP_PATH="${{ steps.find_app.outputs.app_path }}"
+          echo "App bundle path is: $APP_PATH"
 
           echo "Creating target directories inside the .app bundle..."
           mkdir -p "$APP_PATH/Contents/Resources/"
@@ -60,13 +64,12 @@ jobs:
           cp -R "$PY_INSTALL_DIR" "$APP_PATH/Contents/Resources/python"
 
       - name: Create final DMG from the completed .app bundle
-        # Ponownie, użyj symbolu wieloznacznego
-        run: macdeployqt release/*.app -dmg
+        run: macdeployqt "${{ steps.find_app.outputs.app_path }}" -dmg
 
       - name: Upload final DMG as a build artifact
         uses: actions/upload-artifact@v4
         with:
           name: PythonRunner-macOS
-          # I na koniec, znajdź plik .dmg automatycznie
-          path: release/*.dmg
+          # Znajdź plik .dmg, który macdeployqt stworzy w głównym folderze
+          path: "*.dmg"
 
