@@ -2,7 +2,9 @@ name: Build macOS Application
 
 on:
   push:
-    branches: [ "master", "main" ]
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
 
 jobs:
   build:
@@ -16,15 +18,7 @@ jobs:
         uses: jurplel/install-qt-action@v3
         with:
           version: '6.6.0'
-
-      - name: Verify .pro file configuration
-        id: find_pro
-        run: |
-          PRO_FILE=$(find . -maxdepth 1 -name "*.pro" -print -quit)
-          if [ -z "$PRO_FILE" ]; then exit 1; fi
-          echo "Found project file: $PRO_FILE"
-          cat "$PRO_FILE"
-          echo "pro_file=$PRO_FILE" >> "$GITHUB_OUTPUT"
+          # Optionally add Qt modules if needed
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -36,45 +30,58 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      # Zmodyfikowany krok budowania: Wymuszamy TEMPLATE=app w linii komend
-      - name: Build the C++ application (Force .app template)
+      - name: Find .pro file
+        id: find_pro
         run: |
-          # Przekazujemy TEMPLATE=app jako bezpośredni argument do qmake
-          qmake "${{ steps.find_pro.outputs.pro_file }}" "TEMPLATE=app" CONFIG+=release
-          make clean
-          make
+          PRO_FILE=$(find . -maxdepth 1 -name "*macos*.pro" -print -quit)
+          if [ -z "$PRO_FILE" ]; then
+            PRO_FILE=$(find . -maxdepth 1 -name "*.pro" -print -quit)
+          fi
+          if [ -z "$PRO_FILE" ]; then
+            echo "::error::No .pro file found!"
+            exit 1
+          fi
+          echo "Found project file: $PRO_FILE"
+          echo "pro_file=$PRO_FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Build application
+        run: |
+          qmake "${{ steps.find_pro.outputs.pro_file }}" CONFIG+=release
+          make -j$(sysctl -n hw.logicalcpu)
 
       - name: List all files after build
-        run: ls -RF .
+        run: ls -lR .
 
       - name: Find the .app bundle and verify it exists
         id: find_app
         run: |
-          APP_PATH=$(find . -name "*.app" -print -quit)
+          APP_PATH=$(find . -type d -name "*.app" -print -quit)
           if [ -z "$APP_PATH" ]; then
             echo "::error::Build failed: The .app bundle was not found after compilation."
             exit 1
           fi
           echo "App bundle found at: $APP_PATH"
           echo "app_path=$APP_PATH" >> "$GITHUB_OUTPUT"
-      
-      - name: Package Qt libraries
+
+      - name: Deploy Qt libraries
         run: macdeployqt "${{ steps.find_app.outputs.app_path }}"
 
       - name: Embed Python and Scripts
+        if: ${{ steps.find_app.outputs.app_path != '' }}
         run: |
           APP_PATH="${{ steps.find_app.outputs.app_path }}"
           mkdir -p "$APP_PATH/Contents/Resources/"
-          cp -R scripts/ "$APP_PATH/Contents/Resources/scripts"
+          if [ -d scripts ]; then
+            cp -R scripts/ "$APP_PATH/Contents/Resources/scripts"
+          fi
           PY_INSTALL_DIR=$(dirname $(dirname $(which python)))
           cp -R "$PY_INSTALL_DIR" "$APP_PATH/Contents/Resources/python"
 
-      - name: Create final DMG
+      - name: Create DMG
         run: macdeployqt "${{ steps.find_app.outputs.app_path }}" -dmg
 
-      - name: Upload final DMG
+      - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
           name: PythonRunner-macOS
           path: "*.dmg"
-
